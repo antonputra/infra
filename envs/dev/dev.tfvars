@@ -1,0 +1,5 @@
+env      = "dev"
+region   = "us-east-2"
+vpc_cidr = "10.0.0.0/16"
+az1      = "us-east-2a"
+az2      = "us-east-2b"
