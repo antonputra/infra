@@ -2,7 +2,7 @@ resource "aws_launch_template" "this" {
   name_prefix = "${var.env}-${var.name}-ecs-node"
 
   image_id      = var.image_id
-  instance_type = var.instance_type
+  instance_type = var.instance_type # 2 CPU
 
   vpc_security_group_ids = [aws_security_group.this.id]
 

@@ -1,0 +1,94 @@
+services:
+  postgresql:
+    container_name: exotic-postgresql
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${EXOTIC_POSTGRESQL_USER}
+      - POSTGRES_PASSWORD=${EXOTIC_POSTGRESQL_PASSWORD}
+    image: timescale/timescaledb:latest-pg17
+    # Increase max_connections so Postgres can handle more simultaneous clients
+    networks:
+      - temporal-network
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${EXOTIC_POSTGRESQL_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    entrypoint: ["/docker-entrypoint-initdb.d/custom-entrypoint.sh"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/db-init.sql:/docker-entrypoint-initdb.d/db-init.sql
+      - ./sql/create_tables.sql:/docker-entrypoint-initdb.d/create_tables.sql
+      - ./scripts/custom-entrypoint.sh:/docker-entrypoint-initdb.d/custom-entrypoint.sh
+  temporal:
+    container_name: temporal
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${TEMPORAL_POSTGRESQL_USER}
+      - POSTGRES_PWD=${TEMPORAL_POSTGRESQL_PASSWORD}
+      - POSTGRES_SEEDS=postgresql"
+    image: temporalio/auto-setup:${TEMPORAL_VERSION}
+    networks:
+      - temporal-network
+    ports:
+      - 7233:7233
+  temporal-admin-tools:
+    container_name: temporal-admin-tools
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+      - TEMPORAL_ADDRESS=temporal:7233
+    image: temporalio/admin-tools:${TEMPORAL_ADMINTOOLS_VERSION}
+    networks:
+      - temporal-network
+  temporal-ui:
+    container_name: temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_UI_PORT=8080
+      - TEMPORAL_AUTH_ENABLED=true
+      - TEMPORAL_AUTH_PROVIDER_URL=${TEMPORAL_AUTH_PROVIDER_URL}
+      - TEMPORAL_AUTH_CLIENT_ID=${TEMPORAL_AUTH_CLIENT_ID}
+      - TEMPORAL_AUTH_CLIENT_SECRET=${TEMPORAL_AUTH_CLIENT_SECRET}
+      - TEMPORAL_AUTH_CALLBACK_URL=${TEMPORAL_AUTH_CALLBACK_URL}
+      - TEMPORAL_AUTH_SCOPES=openid,profile,email
+    image: temporalio/ui:${TEMPORAL_UI_VERSION}
+    networks:
+      - temporal-network
+    ports:
+      - 8080:8080
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${DOCKER_BUILD_TARGET:-prod}
+    image: app
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - TEMPORAL_ADDRESS=temporal:7233
+    volumes:
+      - ./src:/app/src # Mount the source code
+    depends_on:
+      - temporal
+    networks:
+      - temporal-network
+    command: ["/bin/sh", "/app/scripts/start-worker.sh"]
+    restart: always
+networks:
+  temporal-network:
+    driver: bridge
+volumes:
+  pgdata:
+    external: true
