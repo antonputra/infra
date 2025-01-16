@@ -87,3 +87,8 @@ variable "public_subnet2" {
   type        = string
   description = "Public subnet az2"
 }
+
+variable "cert_arn" {
+  type        = string
+  description = "Certificate arn."
+}

@@ -21,4 +21,5 @@ module "node-app" {
   vpc_id                         = module.vpc.vpc_id
   public_subnet1                 = module.vpc.public_subnets[0]
   public_subnet2                 = module.vpc.public_subnets[1]
+  cert_arn                       = aws_acm_certificate.demo.arn
 }
