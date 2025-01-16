@@ -1,5 +1,3 @@
-variable "enable_ui" {}
-
 variable "env" {
   type        = string
   description = "Environment name."
@@ -73,4 +71,19 @@ variable "aws_ecs_capacity_provider_name" {
 variable "task_envs" {
   type        = list(any)
   description = "ENVs for the task."
+}
+
+variable "vpc_id" {
+  type        = string
+  description = "VPC id."
+}
+
+variable "public_subnet1" {
+  type        = string
+  description = "Public subnet az1"
+}
+
+variable "public_subnet2" {
+  type        = string
+  description = "Public subnet az2"
 }

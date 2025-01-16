@@ -25,6 +25,12 @@ resource "aws_ecs_service" "this" {
     weight            = 100
   }
 
+  load_balancer {
+    target_group_arn = aws_lb_target_group.this.arn
+    container_name   = var.name
+    container_port   = var.app_port
+  }
+
   service_connect_configuration {
     enabled   = true
     namespace = var.ecs_name

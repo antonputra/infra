@@ -42,3 +42,8 @@ variable "subnets" {
   type        = list(string)
   description = "The subnet IDs for the ECS cluster."
 }
+
+variable "alb_sg_ids" {
+  type        = list(string)
+  description = "SGs of ALBs."
+}
