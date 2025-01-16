@@ -64,14 +64,19 @@ aws ssm start-session --region us-east-2 \
     --document-name AWS-StartPortForwardingSession \
     --parameters '{"portNumber":["5432"], "localPortNumber":["5432"]}'
 
+aws ssm start-session --region us-east-2 \
+    --target "ecs:dev-main_d7441b23df6c426086cb772308fc5315_b198e08e395e487aa260f601032aeb5c" \
+    --document-name AWS-StartPortForwardingSession \
+    --parameters '{"portNumber":["8080"], "localPortNumber":["8080"]}'
+
 # SSH to EC2
-aws ssm start-session --region us-east-2 --target i-0483135dee25af8c5
+aws ssm start-session --region us-east-2 --target 0894a11f2ac14ac04
 
 # SSH to container
 aws ecs execute-command \
  --region us-east-2 \
  --cluster dev-main \
- --task arn:aws:ecs:us-east-2:424432388155:task/dev-main/a4c5266a37f54dbcb0efe8805c71e9fa \
+ --task arn:aws:ecs:us-east-2:424432388155:task/dev-main/d7441b23df6c426086cb772308fc5315 \
  --container myapp \
  --command "/bin/bash" \
  --interactive
@@ -79,7 +84,7 @@ aws ecs execute-command \
 aws ecs describe-tasks \
     --cluster dev-main \
     --region us-east-2 \
-    --tasks arn:aws:ecs:us-east-2:424432388155:task/dev-main/a4c5266a37f54dbcb0efe8805c71e9fa
+    --tasks arn:aws:ecs:us-east-2:424432388155:task/dev-main/c8b394d7fea64bb88a2ee018ca106615
 ```
 
 https://docs.timescale.com/self-hosted/latest/install/installation-linux/
@@ -144,3 +149,23 @@ cassabdra-03 2TB
 cassabdra-04 2TB
 
 <!-- cassabdra-04 2TB -->
+
+3 types
+
+1. Linux command -
+2. TCP - nc -vz localhost:8080
+3. Application/http - curl localhost/healthz
+
+- 200
+  201
+
+Prepare:
+
+- Frontend with application load balancer + TLS + HTTPS
+- AWS certificate manager
+- ecs app (nodejs) + backend = db for caching
+- Packer to create Postgres
+- attach data disks using user_data
+
+AWS certificate manager -> 1 year
+Lets encrypt -> 90 days, 60 renewwed
