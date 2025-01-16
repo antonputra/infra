@@ -2,7 +2,7 @@ module "node-app" {
   source = "../../modules/app-v2"
 
   name        = "deno-app"
-  app_version = "v0.2.0"
+  app_version = "v2"
   app_repo    = "424432388155.dkr.ecr.us-east-2.amazonaws.com/node-app"
   app_port    = 8080
   app_cpu     = 1024
