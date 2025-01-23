@@ -21,3 +21,16 @@ resource "aws_vpc_security_group_ingress_rule" "ecs_allow_alb" {
   to_port                      = 8080
   ip_protocol                  = "tcp"
 }
+
+# resource "aws_vpc_security_group_ingress_rule" "internal" {
+#   security_group_id            = aws_security_group.this.id
+#   referenced_security_group_id = aws_security_group.this.id
+#   ip_protocol                  = "-1"
+# }
+
+# TODO: restrict to only ecs sg or use vpc cidr or private subnet cidr
+resource "aws_vpc_security_group_ingress_rule" "ecs_allow_all" {
+  security_group_id = aws_security_group.this.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+}

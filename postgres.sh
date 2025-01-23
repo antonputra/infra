@@ -3,18 +3,21 @@ sudo reboot
 
 ## install
 
-export DATA_DISK="/dev/nvme1n1"
+export DISK_SIZE="10G"
+export DISK_NAME=$(sudo lsblk --json | jq -r --arg size "$DISK_SIZE" '.blockdevices[] | select(.type == "disk" and .size == $size and .ro == false) | .name')
+echo "Disk name is ${DISK_NAME}"
 
 sudo mkdir /data
-sudo mkfs.xfs ${DATA_DISK}
-sudo mount -o defaults ${DATA_DISK} /data
-sudo lsblk --fs
-echo "/dev/disk/by-uuid/0367b2c5-cb51-41bf-8f54-175efdd27c16 /data xfs defaults 0 1" | sudo tee -a /etc/fstab
+sudo mkfs.xfs "/dev/$DISK_NAME"
+sudo mount -o defaults "/dev/$DISK_NAME" /data
+
+export DISK_UUID=$(sudo lsblk --fs --json | jq -r --arg name "$DISK_NAME" '.blockdevices[] | select(.name == $name) | .uuid')
+echo "Disk uuid is ${DISK_UUID}"
+echo "/dev/disk/by-uuid/$DISK_UUID /data xfs defaults 0 1" | sudo tee -a /etc/fstab
+
 
 sudo apt install -y postgresql-common
 yes | sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
-# apt-cache search postgresql-17
-# sudo apt install -y postgresql
 sudo apt install -y postgresql-17
 
 sudo tee /etc/postgresql/17/main/postgresql.conf <<EOF
@@ -843,6 +846,8 @@ data_directory = '/data/main'
 # Connections num: 100
 # Data Storage: ssd
 
+shared_preload_libraries = 'timescaledb'
+
 max_connections = 100
 shared_buffers = 512MB
 effective_cache_size = 1536MB
@@ -861,11 +866,222 @@ EOF
 sudo mv /var/lib/postgresql/17/main /data
 echo "host all all 0.0.0.0/0 md5" | sudo tee -a /etc/postgresql/17/main/pg_hba.conf
 
+echo "deb https://packagecloud.io/timescale/timescaledb/ubuntu/ $(lsb_release -c -s) main" | sudo tee /etc/apt/sources.list.d/timescaledb.list
+wget --quiet -O - https://packagecloud.io/timescale/timescaledb/gpgkey | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/timescaledb.gpg
+sudo apt-get update
+sudo apt-get install -y timescaledb-2-postgresql-17 postgresql-client-17
+
 sudo systemctl restart postgresql
 sudo systemctl status postgresql
 
 sudo -u postgres psql
-CREATE DATABASE mydb;
-ALTER USER postgres WITH PASSWORD 'devops123';
-CREATE USER myapp WITH PASSWORD 'devops123' SUPERUSER CREATEDB CREATEROLE LOGIN;
-exit;
+
+CREATE USER temporal WITH PASSWORD 'temporal' SUPERUSER CREATEDB CREATEROLE LOGIN;
+CREATE DATABASE temporal WITH OWNER temporal;
+CREATE DATABASE market_data;
+\c market_data
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+## Migration
+
+-- Create SpotPair table
+CREATE TABLE IF NOT EXISTS "SpotPair" (
+  "id" SERIAL PRIMARY KEY,
+  "symbol" TEXT UNIQUE NOT NULL,
+  "exchange" TEXT NOT NULL,
+  "active" BOOLEAN DEFAULT TRUE,
+  "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create SpotPrice table
+CREATE TABLE IF NOT EXISTS "SpotPrice" (
+  "id" SERIAL PRIMARY KEY,
+  "symbol" TEXT NOT NULL,
+  "price" FLOAT NOT NULL,
+  "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create Currency table
+CREATE TABLE IF NOT EXISTS "Currency" (
+  "id" SERIAL PRIMARY KEY,
+  "currency" TEXT UNIQUE NOT NULL,
+  "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create VolatilityIndex table
+CREATE TABLE IF NOT EXISTS "VolatilityIndex" (
+  "id" SERIAL PRIMARY KEY,
+  "currency" TEXT NOT NULL,
+  "timestamp" BIGINT NOT NULL,
+  "open" FLOAT NOT NULL,
+  "high" FLOAT NOT NULL,
+  "low" FLOAT NOT NULL,
+  "close" FLOAT NOT NULL,
+  "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create FuturePrice table
+CREATE TABLE IF NOT EXISTS "FuturePrice" (
+  "id" SERIAL PRIMARY KEY,
+  "symbol" TEXT NOT NULL,
+  "futureSymbol" TEXT NOT NULL,
+  "futurePrice" FLOAT NOT NULL,
+  "baseValue" FLOAT NOT NULL,
+  "daysToExpiry" FLOAT, -- Maintain camelCase format
+  "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create TaskFrequency table
+CREATE TABLE IF NOT EXISTS "TaskFrequency" (
+  "id" SERIAL PRIMARY KEY,
+  "taskName" TEXT UNIQUE NOT NULL,
+  "frequencySeconds" INT NOT NULL
+);
+
+-- Create SpotCandleStickData table
+CREATE TABLE IF NOT EXISTS "SpotCandleStick" (
+    "id" SERIAL,                            -- Unique identifier
+    "symbol" TEXT NOT NULL,                 -- Trading pair (e.g., BTCUSDT)
+    "open_price" DOUBLE PRECISION NOT NULL, -- Open price for the interval
+    "close_price" DOUBLE PRECISION NOT NULL, -- Close price for the interval
+    "interval" TEXT NOT NULL,               -- Interval (e.g., "15m")
+    "timestamp" TIMESTAMPTZ NOT NULL,       -- The time of price (use TIMESTAMPTZ)
+    PRIMARY KEY ("id", "timestamp")         -- Composite primary key
+);
+
+-- Step 2: Convert to a hypertable
+SELECT create_hypertable('"SpotCandleStick"', 'timestamp');
+
+-- Step 3: Add indexes
+CREATE INDEX idx_symbol_timestamp ON "SpotCandleStick" ("symbol", "timestamp" DESC);
+
+-- Step 4: Enable compression
+ALTER TABLE "SpotCandleStick" SET (
+    timescaledb.compress
+);
+
+ALTER TABLE "SpotCandleStick" SET (
+    timescaledb.compress_segmentby = 'symbol'
+);
+
+-- Step 5: Compress historical data
+SELECT compress_chunk(chunk_name)
+FROM show_chunks('"SpotCandleStick"') AS chunk_name
+WHERE chunk_name IN (
+  SELECT chunk_name::regclass
+  FROM timescaledb_information.chunks
+  WHERE hypertable_name = '"SpotCandleStick"'
+    AND range_end < NOW() - INTERVAL '1 YEAR'
+);
+
+-- SELECT create_hypertable('"SpotCandleStick"', 'timestamp');
+
+-- CREATE INDEX idx_symbol_timestamp ON "SpotCandleStick" ("symbol", "timestamp" DESC);
+
+-- Insert BTC and ETH into Currency table
+INSERT INTO "Currency" ("currency")
+VALUES ('BTC'), ('ETH')
+ON CONFLICT ("currency") DO NOTHING;
+
+-- Insert SpotPairs into SpotPair table
+INSERT INTO "SpotPair" ("symbol", "exchange", "active") VALUES
+('BTCUSDT', 'binance', TRUE),
+('ETHUSDT', 'binance', TRUE),
+('SOLUSDT', 'binance', TRUE),
+('ADAUSDT', 'binance', TRUE),
+('CHZUSDT', 'binance', TRUE),
+('AVAXUSDT', 'binance', TRUE),
+('FILUSDT', 'binance', TRUE),
+('OPUSDT', 'binance', TRUE),
+('ETCUSDT', 'binance', TRUE),
+('LINKUSDT', 'binance', TRUE),
+('XRPUSDT', 'binance', TRUE),
+('WLDUSDT', 'binance', TRUE),
+('DOGSUSDT', 'binance', TRUE),
+('DOTUSDT', 'binance', TRUE),
+('BCHUSDT', 'binance', TRUE),
+('BNBUSDT', 'binance', TRUE),
+('SUIUSDT', 'binance', TRUE),
+('FTMUSDT', 'binance', TRUE),
+('ALGOUSDT', 'binance', TRUE),
+('MANAUSDT', 'binance', TRUE),
+('LTCUSDT', 'binance', TRUE),
+('UNIUSDT', 'binance', TRUE),
+('NEARUSDT', 'binance', TRUE),
+('RUNEUSDT', 'binance', TRUE),
+('AXSUSDT', 'binance', TRUE),
+('XLMUSDT', 'binance', TRUE),
+('EGLDUSDT', 'binance', TRUE),
+('EOSUSDT', 'binance', TRUE),
+('AAVEUSDT', 'binance', TRUE),
+('DOGEUSDT', 'binance', TRUE),
+('GMTUSDT', 'binance', TRUE),
+('APTUSDT', 'binance', TRUE),
+('PEPEUSDT', 'binance', TRUE),
+('SHIBUSDT', 'binance', TRUE),
+('TRXUSDT', 'binance', TRUE),
+('WIFUSDT', 'binance', TRUE),
+('HNTUSDT', 'binance', TRUE),
+('THETAUSDT', 'binance', TRUE),
+('RIFUSDT', 'binance', TRUE),
+('CELRUSDT', 'binance', TRUE),
+('VETUSDT', 'binance', TRUE),
+('ZILUSDT', 'binance', TRUE),
+('GRTUSDT', 'binance', TRUE),
+('AKROUSDT', 'binance', TRUE),
+('STORJUSDT', 'binance', TRUE),
+('LRCUSDT', 'binance', TRUE),
+('CTKUSDT', 'binance', TRUE),
+('COTIUSDT', 'binance', TRUE),
+('MKRUSDT', 'binance', TRUE),
+('BALUSDT', 'binance', TRUE),
+('SNXUSDT', 'binance', TRUE),
+('KAVAUSDT', 'binance', TRUE),
+('ONEUSDT', 'binance', TRUE),
+('IOSTUSDT', 'binance', TRUE),
+('SXPUSDT', 'binance', TRUE),
+('REPUSDT', 'binance', TRUE),
+('ZRXUSDT', 'binance', TRUE),
+('NKNUSDT', 'binance', TRUE),
+('BNTUSDT', 'binance', TRUE),
+('DOCKUSDT', 'binance', TRUE),
+('POLYUSDT', 'binance', TRUE),
+('TWTUSDT', 'binance', TRUE),
+('FORTHUSDT', 'binance', TRUE),
+('CHESSUSDT', 'binance', TRUE),
+('RSRUSDT', 'binance', TRUE),
+('OCEANUSDT', 'binance', TRUE),
+('ROSEUSDT', 'binance', TRUE),
+('STMXUSDT', 'binance', TRUE),
+('FETUSDT', 'binance', TRUE),
+('BOMEUSDT', 'binance', TRUE),
+('TAOUSDT', 'binance', TRUE),
+('BANDUSDT', 'binance', TRUE),
+('BELUSDT', 'binance', TRUE),
+('TURBOUSDT', 'binance', TRUE),
+('FLOKIUSDT', 'binance', TRUE),
+('GALAUSDT', 'binance', TRUE),
+('MASKUSDT', 'binance', TRUE),
+('CRVUSDT', 'binance', TRUE),
+('STGUSDT', 'binance', TRUE),
+('KSMUSDT', 'binance', TRUE),
+('ATOMUSDT', 'binance', TRUE),
+('XECUSDT', 'binance', TRUE),
+('DYDXUSDT', 'binance', TRUE),
+('COMPUSDT', 'binance', TRUE),
+('SUSHIUSDT', 'binance', TRUE),
+('BATUSDT', 'binance', TRUE),
+('ENJUSDT', 'binance', TRUE),
+('AUDIOUSDT', 'binance', TRUE),
+('FLOWUSDT', 'binance', TRUE),
+('INJUSDT', 'binance', TRUE)
+ON CONFLICT ("symbol") DO NOTHING;
+
+
+-- Insert frequency values of the work into TaskFrequency table
+INSERT INTO "TaskFrequency" ("taskName", "frequencySeconds") 
+VALUES 
+('fetchSpotData', 15),
+('fetchFutures', 300),
+('fetchVolatility', 60)
+ON CONFLICT ("taskName") DO NOTHING;

@@ -80,8 +80,8 @@ aws ssm start-session --region us-east-2 --target 0894a11f2ac14ac04
 aws ecs execute-command \
  --region us-east-2 \
  --cluster dev-main \
- --task arn:aws:ecs:us-east-2:424432388155:task/dev-main/d7441b23df6c426086cb772308fc5315 \
- --container myapp \
+ --task arn:aws:ecs:us-east-2:424432388155:task/dev-main/b0da9bfc0b894704a158972d1782ba9f \
+ --container temporal \
  --command "/bin/bash" \
  --interactive
 
@@ -173,3 +173,13 @@ Prepare:
 
 AWS certificate manager -> 1 year
 Lets encrypt -> 90 days, 60 renewwed
+
+## Validate Temporal
+
+```bash
+wget https://github.com/fullstorydev/grpcurl/releases/download/v1.7.0/grpcurl_1.7.0_linux_x86_64.tar.gz && tar -xvf grpcurl_1.7.0_linux_x86_64.tar.gz && chmod +x grpcurl
+
+./grpcurl -plaintext -d '{"service": "temporal.api.workflowservice.v1.WorkflowService"}' temporal.dev.exotic.ecs:7233 grpc.health.v1.Health/Check
+
+./tctl --address temporal.dev.exotic.ecs:7233 cluster health
+```

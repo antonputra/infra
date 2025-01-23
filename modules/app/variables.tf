@@ -1,5 +1,3 @@
-variable "enable_ui" {}
-
 variable "env" {
   type        = string
   description = "Environment name."
@@ -73,4 +71,19 @@ variable "aws_ecs_capacity_provider_name" {
 variable "task_envs" {
   type        = list(any)
   description = "ENVs for the task."
+}
+
+variable "health_check" {
+  type        = string
+  description = "Health check."
+}
+
+variable "namespace_id" {
+  type        = string
+  description = "Namespace Id."
+}
+
+variable "replicas" {
+  type        = number
+  description = "Number of replicas to run."
 }

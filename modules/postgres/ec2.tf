@@ -1,7 +1,6 @@
 resource "aws_instance" "this" {
   ami           = var.ami
   instance_type = var.machine_type
-  key_name      = "aws-demo"
   monitoring    = false
   subnet_id     = var.subnet_id
 

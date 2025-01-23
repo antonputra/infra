@@ -26,7 +26,6 @@ resource "aws_ecs_task_definition" "this" {
           containerPort = var.app_port
           hostPort      = var.app_port
           protocol      = "tcp"
-          appProtocol   = "http"
         }
       ]
       logConfiguration = {
@@ -36,6 +35,12 @@ resource "aws_ecs_task_definition" "this" {
           awslogs-region = var.region
         }
       }
+      healthCheck = {
+        command  = ["CMD-SHELL", var.health_check],
+        interval = 30,
+        timeout  = 5,
+        retries  = 3
+      },
     }
   ])
 
