@@ -203,3 +203,12 @@ antonputra.com -> temporal-ui-12347936.us-east-2.elb.amazonaws.com
 DNS Alias
 
 antonputra.com -> temporal-ui-12347936.us-east-2.elb.amazonaws.com
+
+## ECS
+
+1. To create Service -> 5 replicas
+   Service monitor and redeploy or restart
+
+   Container -> Task
+
+2. Create Task

@@ -7,7 +7,7 @@ module "back-office" {
   app_port     = 8080
   app_cpu      = 1024
   app_memory   = 512
-  replicas     = 1
+  replicas     = 10
   namespace_id = aws_service_discovery_private_dns_namespace.ecs.id
   health_check = "echo healthcheck" # TODO: add valid health check
   # TODO: Add all envs
