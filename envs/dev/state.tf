@@ -1,8 +1,8 @@
-terraform {
-  backend "local" {
-    path = "state/dev/terraform.tfstate"
-  }
-}
+# terraform {
+#   backend "local" {
+#     path = "state/dev/terraform.tfstate"
+#   }
+# }
 
 # terraform {
 #   backend "s3" {

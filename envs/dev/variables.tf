@@ -27,3 +27,8 @@ variable "az2" {
   type        = string
   description = "Availability zone in AWS."
 }
+
+variable "domain" {
+  type        = string
+  description = "Domain"
+}

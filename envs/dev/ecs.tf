@@ -1,3 +1,8 @@
+resource "aws_service_discovery_private_dns_namespace" "ecs" {
+  name = "${var.env}.${var.domain}.ecs"
+  vpc  = module.vpc.vpc_id
+}
+
 module "ecs" {
   source = "../../modules/ecs"
 
@@ -10,7 +15,6 @@ module "ecs" {
   min_size      = 0
   max_size      = 5
   subnets       = module.vpc.private_subnets
-  alb_sg_ids = [
-    module.node-app.alb_sg_id
-  ]
+  # alb_sg_ids = [module.node-app.alb_sg_id]
+  alb_sg_ids = []
 }

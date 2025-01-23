@@ -1,7 +1,7 @@
-resource "aws_route53_zone" "this" {
-  name = "antonputra.pvt"
+# resource "aws_route53_zone" "this" {
+#   name = "antonputra.pvt"
 
-  vpc {
-    vpc_id = module.vpc.vpc_id
-  }
-}
+#   vpc {
+#     vpc_id = module.vpc.vpc_id
+#   }
+# }
