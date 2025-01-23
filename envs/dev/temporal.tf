@@ -1,3 +1,11 @@
+data "aws_secretsmanager_secret_version" "creds" {
+  secret_id = "dev-temporal-database"
+}
+
+locals {
+  db_creds = jsondecode(data.aws_secretsmanager_secret_version.creds.secret_string)
+}
+
 module "temporal" {
   source = "../../modules/app"
 
@@ -25,7 +33,7 @@ module "temporal" {
     },
     {
       name  = "POSTGRES_PWD",
-      value = "temporal"
+      value = local.db_creds.password
     },
     {
       name  = "POSTGRES_SEEDS",
