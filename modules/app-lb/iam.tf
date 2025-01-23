@@ -18,7 +18,7 @@ resource "aws_iam_role" "this" {
 
 resource "aws_iam_policy" "this" {
   policy = file("${path.module}/iam/ecs-exec-demo-task-role-policy.json")
-  name   = "ecs-exec-demo-task-role-policy"
+  name   = "${var.env}-${var.name}-ecs-exec-demo-task-role-policy"
 }
 
 resource "aws_iam_role_policy_attachment" "this" {

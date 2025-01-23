@@ -92,3 +92,12 @@ variable "cert_arn" {
   type        = string
   description = "Certificate arn."
 }
+
+variable "health_check" {
+  type        = string
+  description = "Health check."
+}
+
+variable "replicas" {
+  type = number
+}

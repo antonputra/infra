@@ -183,3 +183,23 @@ wget https://github.com/fullstorydev/grpcurl/releases/download/v1.7.0/grpcurl_1.
 
 ./tctl --address temporal.dev.exotic.ecs:7233 cluster health
 ```
+
+DNS A Record points to IP v4 address
+DNS AAAA Record points to IP v6 address
+
+postgres.dev.exotic.pvt -> 10.0.27.153
+
+DNS CNAME record points to other DNS (reference)
+
+temporal-ui.antonputra.com -> temporal-ui-12347936.us-east-2.elb.amazonaws.com
+
+postgres.exotic.pvt -> postgres.dev.exotic.pvt -> 10.0.27.153
+
+web site CNAME
+
+www.antonputra.com -> temporal-ui-12347936.us-east-2.elb.amazonaws.com
+antonputra.com -> temporal-ui-12347936.us-east-2.elb.amazonaws.com
+
+DNS Alias
+
+antonputra.com -> temporal-ui-12347936.us-east-2.elb.amazonaws.com

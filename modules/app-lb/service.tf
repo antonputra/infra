@@ -2,7 +2,7 @@ resource "aws_ecs_service" "this" {
   name            = var.name
   cluster         = var.ecs_id
   task_definition = aws_ecs_task_definition.this.arn
-  desired_count   = 2
+  desired_count   = var.replicas
 
   network_configuration {
     subnets         = var.subnets
@@ -31,21 +31,7 @@ resource "aws_ecs_service" "this" {
     container_port   = var.app_port
   }
 
-  service_connect_configuration {
-    enabled   = true
-    namespace = var.ecs_name
-
-    service {
-      port_name = "web"
-      client_alias {
-        dns_name = var.name
-        port     = var.app_port
-      }
-      discovery_name = var.name
-    }
-  }
-
-  lifecycle {
-    ignore_changes = [desired_count]
-  }
+  #   lifecycle {
+  #     ignore_changes = [desired_count]
+  #   }
 }
