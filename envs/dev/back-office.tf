@@ -10,6 +10,7 @@ module "back-office" {
   replicas     = 10
   namespace_id = aws_service_discovery_private_dns_namespace.ecs.id
   health_check = "echo healthcheck" # TODO: add valid health check
+
   # TODO: Add all envs
   task_envs = [
     {

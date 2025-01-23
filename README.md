@@ -212,3 +212,7 @@ antonputra.com -> temporal-ui-12347936.us-east-2.elb.amazonaws.com
    Container -> Task
 
 2. Create Task
+
+sudo cat /var/log/cloud-init-output.log
+
+sudo tail -f /var/log/cloud-init-output.log

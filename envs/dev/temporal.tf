@@ -1,9 +1,13 @@
+# Secret name: dev-temporal-database
+# Secret key/value: password:temporal
+
 data "aws_secretsmanager_secret_version" "creds" {
   secret_id = "dev-temporal-database"
 }
 
 locals {
-  db_creds = jsondecode(data.aws_secretsmanager_secret_version.creds.secret_string)
+  db_creds     = jsondecode(data.aws_secretsmanager_secret_version.creds.secret_string)
+  postgres_url = "postgresql://temporal:${local.db_creds.password}@postgres.dev.exotic.pvt:5432/market_data?connection_limit=50"
 }
 
 module "temporal" {
